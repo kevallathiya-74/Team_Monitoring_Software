@@ -377,6 +377,8 @@ After each step:
 - tests
 - confirm working
 
+
+note : "frontend on human readble data show and all data readable UI and text and message format also readable and UI also smooth"
 ====================================================
 START NOW
 ====================================================
