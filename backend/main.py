@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     logger.info("Initializing database...")
     try:
+        import backend.models  # Import models to ensure they are registered
         async with engine.begin() as conn:
             # Create all tables if they don't exist
             await conn.run_sync(Base.metadata.create_all)
@@ -44,4 +45,4 @@ app.include_router(api_router, prefix=settings.API_V1_STR)
 
 @app.get("/")
 async def root():
-    return {"message": f"Welcome to {settings.PROJECT_NAME} API. Visit /docs for documentation."}
+    return {"message": f"Welcome to {settings.PROJECT_NAME} API."}
