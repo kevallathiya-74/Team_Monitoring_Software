@@ -1,5 +1,5 @@
 from datetime import datetime
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.api import deps
@@ -13,7 +13,8 @@ router = APIRouter()
 async def create_activity_batch(
     payload: ActivityBatchCreate,
     db: AsyncSession = Depends(deps.get_db),
-    current_device: Device = Depends(deps.get_current_device)
+    current_device: Device = Depends(deps.get_current_device),
+    agent_key: None = Depends(deps.verify_agent_key),
 ):
     try:
         activity_logs = []
@@ -52,5 +53,5 @@ async def create_activity_batch(
             }
         }
     except Exception as e:
-        import traceback
-        return {"error": str(e), "traceback": traceback.format_exc()}
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"Activity batch failed: {e}")

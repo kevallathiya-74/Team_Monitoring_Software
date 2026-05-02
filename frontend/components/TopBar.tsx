@@ -2,10 +2,10 @@
 import React from 'react';
 import {
   AppBar, Toolbar, IconButton, Typography, Box,
-  Chip, Tooltip, Badge
+  Chip, Tooltip
 } from '@mui/material';
 import {
-  MenuRounded, NotificationsRounded, RefreshRounded,
+  MenuRounded, RefreshRounded,
   FiberManualRecordRounded
 } from '@mui/icons-material';
 
@@ -15,12 +15,20 @@ interface TopBarProps {
   onMenuClick?: () => void;
   onRefresh?: () => void;
   liveCount?: number;
+  lastUpdatedSeconds?: number;
 }
 
-export default function TopBar({ title, subtitle, onMenuClick, onRefresh, liveCount }: TopBarProps) {
+export default function TopBar({
+  title,
+  subtitle,
+  onMenuClick,
+  onRefresh,
+  liveCount,
+  lastUpdatedSeconds,
+}: TopBarProps) {
   return (
-    <AppBar position="sticky" elevation={0}>
-      <Toolbar sx={{ gap: 2, minHeight: { xs: 60, sm: 64 } }}>
+    <AppBar position="static" elevation={0}>
+      <Toolbar sx={{ gap: 2, minHeight: { xs: 56, sm: 60 }, px: { xs: 2, sm: 3 } }}>
         {/* Mobile menu button */}
         <IconButton
           edge="start"
@@ -32,11 +40,11 @@ export default function TopBar({ title, subtitle, onMenuClick, onRefresh, liveCo
 
         {/* Title */}
         <Box sx={{ flex: 1 }}>
-          <Typography variant="h6" fontWeight={700} lineHeight={1.2} color="text.primary">
+          <Typography sx={{ fontSize: '1.25rem', fontWeight: 600, lineHeight: 1.2, color: 'text.primary' }}>
             {title}
           </Typography>
           {subtitle && (
-            <Typography variant="caption" color="text.secondary">
+            <Typography sx={{ fontSize: '0.875rem', color: 'text.secondary', mt: 0.25 }}>
               {subtitle}
             </Typography>
           )}
@@ -45,15 +53,29 @@ export default function TopBar({ title, subtitle, onMenuClick, onRefresh, liveCo
         {/* Live badge */}
         {liveCount !== undefined && (
           <Chip
-            icon={<FiberManualRecordRounded sx={{ fontSize: '10px !important', color: '#00d4aa !important' }} />}
+            icon={<FiberManualRecordRounded sx={{ fontSize: '10px !important', color: '#10b981 !important' }} />}
             label={`${liveCount} Online`}
             size="small"
             sx={{
-              background: 'rgba(0, 212, 170, 0.12)',
-              border: '1px solid rgba(0, 212, 170, 0.3)',
-              color: '#00d4aa',
-              fontWeight: 600,
+              background: 'rgba(16, 185, 129, 0.12)',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              color: '#10b981',
+              fontWeight: 700,
               fontSize: '0.75rem',
+            }}
+          />
+        )}
+
+        {lastUpdatedSeconds !== undefined && (
+          <Chip
+            label={`Updated ${lastUpdatedSeconds}s ago`}
+            size="small"
+            sx={{
+              background: 'rgba(203, 213, 225, 0.08)',
+              border: '1px solid rgba(203, 213, 225, 0.2)',
+              color: 'text.secondary',
+              fontWeight: 600,
+              fontSize: '0.72rem',
             }}
           />
         )}
@@ -66,15 +88,6 @@ export default function TopBar({ title, subtitle, onMenuClick, onRefresh, liveCo
             </IconButton>
           </Tooltip>
         )}
-
-        {/* Notifications (placeholder) */}
-        <Tooltip title="Notifications">
-          <IconButton size="small" sx={{ color: 'text.secondary' }}>
-            <Badge badgeContent={0} color="error">
-              <NotificationsRounded fontSize="small" />
-            </Badge>
-          </IconButton>
-        </Tooltip>
       </Toolbar>
     </AppBar>
   );

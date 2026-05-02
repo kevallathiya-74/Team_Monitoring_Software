@@ -2,11 +2,11 @@
 import React from 'react';
 import {
   Box, Drawer, List, ListItemButton, ListItemIcon, ListItemText,
-  Typography, Divider, Avatar, Chip, Tooltip, IconButton, GlobalStyles
+  Typography, Divider, Avatar, Tooltip, IconButton, GlobalStyles
 } from '@mui/material';
 import {
   DashboardRounded, DevicesRounded, AssessmentRounded,
-  LogoutRounded, MonitorHeartRounded, CircleRounded,
+  LogoutRounded, MonitorHeartRounded,
 } from '@mui/icons-material';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
@@ -35,37 +35,25 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
   };
 
   const content = (
-    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'background.paper' }}>
       {/* Logo */}
-      <Box sx={{ px: 2.5, py: 3, display: 'flex', alignItems: 'center', gap: 1.5 }}>
+      <Box sx={{ px: 3, py: 2.5, display: 'flex', alignItems: 'center', gap: 1.5 }}>
         <Box
           sx={{
             width: 38, height: 38, borderRadius: '10px',
-            background: 'linear-gradient(135deg, #4f6bff 0%, #7b8fff 100%)',
+            background: 'linear-gradient(135deg, #a855f7 0%, #d946ef 100%)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            boxShadow: '0 4px 14px rgba(79,107,255,0.4)',
+            boxShadow: '0 4px 14px rgba(168, 85, 247, 0.35)',
           }}
         >
           <MonitorHeartRounded sx={{ color: '#fff', fontSize: 20 }} />
         </Box>
         <Box>
-          <Typography variant="subtitle1" fontWeight={700} lineHeight={1.2} color="text.primary">
+          <Typography variant="subtitle1" fontWeight={700} sx={{ lineHeight: 1.2 }} color="text.primary">
             WorkForce AI
           </Typography>
           <Typography variant="caption" color="text.secondary">
             Monitoring Platform
-          </Typography>
-        </Box>
-      </Box>
-
-      <Divider />
-
-      {/* Status indicator */}
-      <Box sx={{ px: 2.5, py: 1.5 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <CircleRounded sx={{ fontSize: 8, color: '#00d4aa', animation: 'pulse 2s infinite' }} />
-          <Typography variant="caption" color="success.main" fontWeight={600}>
-            Live Monitoring Active
           </Typography>
         </Box>
       </Box>
@@ -85,26 +73,43 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
           {navItems.map((item) => {
             const active = pathname === item.path || pathname.startsWith(item.path + '/');
             return (
-              <Tooltip key={item.path} title="" placement="right">
+              <Tooltip key={item.path} title={item.label} placement="right">
                 <ListItemButton
                   selected={active}
                   onClick={() => { router.push(item.path); onClose?.(); }}
-                  sx={{ mx: 1, mb: 0.5, borderRadius: '10px' }}
+                  sx={{
+                    mx: 1.5,
+                    mb: 0.5,
+                    px: 1.5,
+                    borderRadius: '12px',
+                    minHeight: 44,
+                    transition: 'all 150ms ease',
+                    '&.Mui-selected': {
+                      background: 'rgba(168, 85, 247, 0.16)',
+                      border: '1px solid rgba(168, 85, 247, 0.28)',
+                    },
+                  }}
                 >
                   <ListItemIcon sx={{
-                    minWidth: 38,
-                    color: active ? 'primary.main' : 'text.secondary',
-                    transition: 'color 0.2s',
+                    minWidth: 34,
+                      color: active ? 'primary.main' : 'text.secondary',
+                    transition: 'color 150ms ease',
                   }}>
                     {item.icon}
                   </ListItemIcon>
                   <ListItemText
-                    primary={item.label}
-                    primaryTypographyProps={{
-                      fontWeight: active ? 700 : 500,
-                      fontSize: '0.9rem',
-                      color: active ? 'primary.light' : 'text.primary',
-                    }}
+                    primary={
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: active ? 700 : 500,
+                          fontSize: '0.9rem',
+                          color: active ? 'primary.light' : 'text.primary',
+                        }}
+                      >
+                        {item.label}
+                      </Typography>
+                    }
                   />
                   {active && (
                     <Box sx={{
@@ -126,23 +131,22 @@ export default function Sidebar({ mobileOpen, onClose }: SidebarProps) {
       <Box sx={{ p: 2 }}>
         <Box sx={{
           display: 'flex', alignItems: 'center', gap: 1.5, p: 1.5,
-          borderRadius: '10px', background: 'rgba(79,107,255,0.06)',
-          border: '1px solid rgba(79,107,255,0.12)',
+          borderRadius: '12px', background: 'rgba(168,85,247,0.06)',
+          border: '1px solid rgba(168,85,247,0.12)',
         }}>
           <Avatar sx={{
             width: 34, height: 34, fontSize: '0.85rem', fontWeight: 700,
-            background: 'linear-gradient(135deg, #4f6bff, #7b8fff)',
+            background: 'linear-gradient(135deg, #a855f7, #d946ef)',
           }}>
             A
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Typography variant="body2" fontWeight={600} noWrap>Admin</Typography>
-            <Chip label="Administrator" size="small" color="primary" variant="outlined"
-              sx={{ height: 18, fontSize: '0.65rem', mt: 0.2 }} />
+            <Typography variant="caption" color="text.secondary" noWrap>Administrator</Typography>
           </Box>
           <Tooltip title="Logout">
-            <IconButton size="small" onClick={handleLogout} sx={{ color: 'text.secondary',
-              '&:hover': { color: 'error.main' } }}>
+            <IconButton size="small" onClick={handleLogout} sx={{ color: 'text.secondary', transition: 'all 150ms ease',
+                  '&:hover': { color: 'error.main', background: 'rgba(239, 68, 68, 0.12)' } }}>
               <LogoutRounded fontSize="small" />
             </IconButton>
           </Tooltip>

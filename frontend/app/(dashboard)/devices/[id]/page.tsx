@@ -1,132 +1,71 @@
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   Box, Card, CardContent, Typography, Chip, Grid, Avatar,
-  Skeleton, Alert, Divider, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow, LinearProgress,
-  Tab, Tabs, IconButton, Tooltip, Button
+  Skeleton, Divider, LinearProgress,
+  Tab, Tabs, Button
 } from '@mui/material';
 import {
-  ArrowBackRounded, WifiRounded, WifiOffRounded, AccessTimeRounded,
+  ArrowBackRounded,
   AppsRounded, VideocamRounded, FiberManualRecordRounded,
-  RefreshRounded, PlayCircleRounded, DesktopWindowsRounded,
-  HourglassEmptyRounded
+  DesktopWindowsRounded
 } from '@mui/icons-material';
-import { formatDistanceToNow, parseISO, format } from 'date-fns';
+import { formatDistanceToNow, parseISO } from 'date-fns';
+import dynamic from 'next/dynamic';
 import TopBar from '@/components/TopBar';
-import { getDashboardDevices, getDeviceTimeline, getDeviceRecordings, type DeviceSummary, type ActivityLog, type Recording } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api';
+import { useDashboardDevices, useDeviceRecordings, useDeviceTimeline } from '@/hooks/useMonitoringData';
+import { useMonitoringStore } from '@/store/monitoringStore';
+import { ErrorState } from '@/components/ui/DataState';
 
-// ─── Activity Timeline Item ────────────────────────────────────────────────────
-function TimelineRow({ log }: { log: ActivityLog }) {
-  const ts = (() => { try { return format(parseISO(log.timestamp), 'HH:mm:ss'); } catch { return '—'; } })();
-  const dur = log.duration_seconds >= 60
-    ? `${Math.floor(log.duration_seconds / 60)}m ${log.duration_seconds % 60}s`
-    : `${log.duration_seconds}s`;
-
-  return (
-    <TableRow hover>
-      <TableCell>
-        <Typography variant="caption" fontFamily="monospace" color="text.secondary">{ts}</Typography>
-      </TableCell>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <AppsRounded sx={{ fontSize: 14, color: log.is_idle ? 'warning.main' : 'primary.main' }} />
-          <Typography variant="body2" fontWeight={600} noWrap>{log.app_name || '—'}</Typography>
-        </Box>
-      </TableCell>
-      <TableCell sx={{ maxWidth: 280 }}>
-        <Typography variant="body2" color="text.secondary" noWrap sx={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>
-          {log.window_title || '—'}
-        </Typography>
-      </TableCell>
-      <TableCell>
-        <Chip
-          label={log.is_idle ? 'Idle' : 'Active'}
-          size="small"
-          sx={{
-            fontSize: '0.68rem', fontWeight: 700,
-            background: log.is_idle ? 'rgba(255,179,71,0.12)' : 'rgba(0,212,170,0.1)',
-            color: log.is_idle ? '#ffb347' : '#00d4aa',
-            border: `1px solid ${log.is_idle ? '#ffb34730' : '#00d4aa30'}`,
-          }}
-        />
-      </TableCell>
-      <TableCell>
-        <Typography variant="body2" color="text.secondary">{dur}</Typography>
-      </TableCell>
-    </TableRow>
-  );
-}
-
-// ─── Recording Row ─────────────────────────────────────────────────────────────
-function RecordingRow({ rec }: { rec: Recording }) {
-  const date = (() => { try { return format(parseISO(rec.start_time || rec.created_at), 'MMM d, yyyy HH:mm'); } catch { return '—'; } })();
-  const dur = rec.duration_seconds >= 60
-    ? `${Math.floor(rec.duration_seconds / 60)}m ${rec.duration_seconds % 60}s`
-    : `${rec.duration_seconds}s`;
-
-  return (
-    <TableRow hover>
-      <TableCell>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <PlayCircleRounded sx={{ color: 'primary.main', fontSize: 20 }} />
-          <Typography variant="body2" fontFamily="monospace" fontSize="0.78rem" color="text.secondary" noWrap>
-            {rec.file_path.split(/[\\/]/).pop()}
-          </Typography>
-        </Box>
-      </TableCell>
-      <TableCell><Typography variant="body2" color="text.secondary">{date}</Typography></TableCell>
-      <TableCell><Typography variant="body2" color="text.secondary">{dur}</Typography></TableCell>
-      <TableCell>
-        <Typography variant="caption" fontFamily="monospace" color="text.secondary" fontSize="0.7rem" sx={{
-          background: 'rgba(255,255,255,0.04)', px: 1, py: 0.4, borderRadius: '6px',
-          border: '1px solid rgba(255,255,255,0.08)', display: 'inline-block',
-        }}>
-          {rec.file_path}
-        </Typography>
-      </TableCell>
-    </TableRow>
-  );
-}
+const ActivityTimelineTable = dynamic(() => import('@/components/device/ActivityTimelineTable'));
+const RecordingsTable = dynamic(() => import('@/components/device/RecordingsTable'));
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 export default function DeviceDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router  = useRouter();
+  const router = useRouter();
+  const tab = useMonitoringStore((s) => s.deviceDetailTab);
+  const setTab = useMonitoringStore((s) => s.setDeviceDetailTab);
+  const timelineFilter = useMonitoringStore((s) => s.timelineFilter);
+  const setTimelineFilter = useMonitoringStore((s) => s.setTimelineFilter);
+  const recordingsPage = useMonitoringStore((s) => s.recordingsPage);
+  const setRecordingsPage = useMonitoringStore((s) => s.setRecordingsPage);
+  const recordingsRowsPerPage = useMonitoringStore((s) => s.recordingsRowsPerPage);
+  const setRecordingsRowsPerPage = useMonitoringStore((s) => s.setRecordingsRowsPerPage);
 
-  const [device, setDevice]         = useState<DeviceSummary | null>(null);
-  const [timeline, setTimeline]     = useState<ActivityLog[]>([]);
-  const [recordings, setRecordings] = useState<Recording[]>([]);
-  const [loading, setLoading]       = useState(true);
-  const [error, setError]           = useState('');
-  const [tab, setTab]               = useState(0);
+  const {
+    data: devices = [],
+    error: deviceErr,
+    isLoading: deviceLoading,
+    isValidating: deviceRefreshing,
+    mutate: refreshDevices,
+  } = useDashboardDevices();
 
-  const fetchAll = useCallback(async () => {
-    if (!id) return;
-    setError('');
-    try {
-      const [devRes, timelineRes, recsRes] = await Promise.all([
-        getDashboardDevices(),
-        getDeviceTimeline(id),
-        getDeviceRecordings(id),
-      ]);
-      const found = devRes.data.find((d) => d.id === id);
-      setDevice(found || null);
-      setTimeline(timelineRes.data);
-      setRecordings(recsRes.data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load device data.');
-    } finally {
-      setLoading(false);
-    }
-  }, [id]);
+  const {
+    data: timeline = [],
+    error: timelineErr,
+    isLoading: timelineLoading,
+    isValidating: timelineRefreshing,
+    mutate: refreshTimeline,
+  } = useDeviceTimeline(id);
 
-  useEffect(() => { fetchAll(); }, [fetchAll]);
-  useEffect(() => {
-    const t = setInterval(fetchAll, 30_000);
-    return () => clearInterval(t);
-  }, [fetchAll]);
+  const {
+    data: recordings = [],
+    error: recordingsErr,
+    isLoading: recordingsLoading,
+    isValidating: recordingsRefreshing,
+    mutate: refreshRecordings,
+  } = useDeviceRecordings(id);
+
+  const loading = deviceLoading || timelineLoading || recordingsLoading;
+  const refreshing = deviceRefreshing || timelineRefreshing || recordingsRefreshing;
+
+  const device = useMemo(
+    () => devices.find((d) => d.id === id) || null,
+    [devices, id],
+  );
 
   // Compute stats from timeline
   const activeSeconds = timeline.filter((l) => !l.is_idle).reduce((s, l) => s + l.duration_seconds, 0);
@@ -146,7 +85,9 @@ export default function DeviceDetailPage() {
       <TopBar
         title={loading ? 'Loading device…' : (device?.hostname || 'Device Detail')}
         subtitle={device ? `${device.local_ip} · Last seen ${lastSeen}` : ''}
-        onRefresh={() => { setLoading(true); fetchAll(); }}
+        onRefresh={() => {
+          void Promise.all([refreshDevices(), refreshTimeline(), refreshRecordings()]);
+        }}
       />
 
       <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
@@ -159,7 +100,16 @@ export default function DeviceDetailPage() {
           Back to Devices
         </Button>
 
-        {error && <Alert severity="error" sx={{ mb: 2.5 }}>{error}</Alert>}
+        {(deviceErr || timelineErr || recordingsErr) && (
+          <Box sx={{ mb: 2.5 }}>
+            <ErrorState
+              message={apiErrorMessage(deviceErr || timelineErr || recordingsErr, 'Failed to load device data.')}
+              onRetry={() => {
+                void Promise.all([refreshDevices(), refreshTimeline(), refreshRecordings()]);
+              }}
+            />
+          </Box>
+        )}
 
         {/* ── Device Info Header ── */}
         <Card sx={{ mb: 3 }}>
@@ -275,81 +225,35 @@ export default function DeviceDetailPage() {
 
           {/* Timeline tab */}
           {tab === 0 && (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>Time</TableCell>
-                    <TableCell>Application</TableCell>
-                    <TableCell>Window Title</TableCell>
-                    <TableCell>State</TableCell>
-                    <TableCell>Duration</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {loading ? (
-                    [...Array(6)].map((_, i) => (
-                      <TableRow key={i}>
-                        {[...Array(5)].map((__, j) => (
-                          <TableCell key={j}><Skeleton height={22} /></TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : timeline.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} sx={{ textAlign: 'center', py: 6 }}>
-                        <HourglassEmptyRounded sx={{ fontSize: 40, opacity: 0.3, display: 'block', mx: 'auto', mb: 1 }} />
-                        <Typography variant="body2" color="text.secondary">
-                          No activity logs for the last 24 hours.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    timeline.map((log) => <TimelineRow key={log.id} log={log} />)
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <ActivityTimelineTable
+              loading={timelineLoading && timeline.length === 0}
+              logs={timeline}
+              filter={timelineFilter}
+              onFilterChange={setTimelineFilter}
+            />
           )}
 
           {/* Recordings tab */}
           {tab === 1 && (
-            <TableContainer>
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell>File</TableCell>
-                    <TableCell>Recorded At</TableCell>
-                    <TableCell>Duration</TableCell>
-                    <TableCell>File Path</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {loading ? (
-                    [...Array(4)].map((_, i) => (
-                      <TableRow key={i}>
-                        {[...Array(4)].map((__, j) => (
-                          <TableCell key={j}><Skeleton height={22} /></TableCell>
-                        ))}
-                      </TableRow>
-                    ))
-                  ) : recordings.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} sx={{ textAlign: 'center', py: 6 }}>
-                        <VideocamRounded sx={{ fontSize: 40, opacity: 0.3, display: 'block', mx: 'auto', mb: 1 }} />
-                        <Typography variant="body2" color="text.secondary">
-                          No recordings available for this device.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    recordings.map((rec) => <RecordingRow key={rec.id} rec={rec} />)
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
+            <RecordingsTable
+              loading={recordingsLoading && recordings.length === 0}
+              recordings={recordings}
+              page={recordingsPage}
+              rowsPerPage={recordingsRowsPerPage}
+              onPageChange={setRecordingsPage}
+              onRowsPerPageChange={(value) => {
+                setRecordingsRowsPerPage(value);
+                setRecordingsPage(0);
+              }}
+            />
           )}
         </Card>
+
+        {refreshing && !loading && (
+          <Typography sx={{ mt: 1.5, fontSize: '0.8rem', color: 'text.secondary' }}>
+            Refreshing latest device data...
+          </Typography>
+        )}
       </Box>
     </Box>
   );

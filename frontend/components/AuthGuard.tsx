@@ -1,5 +1,5 @@
 'use client';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Box, CircularProgress, Typography } from '@mui/material';
@@ -7,18 +7,19 @@ import { Box, CircularProgress, Typography } from '@mui/material';
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, token } = useAuthStore();
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    // Check localStorage directly for hydration safety
-    const storedToken = localStorage.getItem('admin_token');
+    setMounted(true);
+
+    // Check localStorage directly after mount so SSR and the first client render match.
+    const storedToken = localStorage.getItem('auth_token');
     if (!storedToken && !token) {
       router.replace('/login');
     }
   }, [token, router]);
 
-  const storedToken = typeof window !== 'undefined' ? localStorage.getItem('admin_token') : null;
-
-  if (!isAuthenticated && !storedToken) {
+  if (!mounted || (!isAuthenticated && !token)) {
     return (
       <Box
         sx={{
@@ -30,7 +31,7 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           gap: 2,
         }}
       >
-        <CircularProgress sx={{ color: '#4f6bff' }} size={40} />
+        <CircularProgress sx={{ color: 'primary.main' }} size={40} />
         <Typography variant="body2" color="text.secondary">
           Verifying session…
         </Typography>

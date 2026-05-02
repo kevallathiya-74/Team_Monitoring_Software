@@ -3,6 +3,13 @@ from datetime import datetime
 from pydantic import BaseModel
 from backend.models.recording import MediaType
 
+class RecordingMetadataCreate(BaseModel):
+    session_id: uuid.UUID
+    file_path: str
+    start_time: datetime
+    duration_seconds: int
+    media_type: MediaType = MediaType.video
+
 class RecordingResponse(BaseModel):
     id: uuid.UUID
     session_id: uuid.UUID

@@ -6,6 +6,7 @@ from backend.core.config import settings
 from backend.api.api_v1.api import api_router
 from backend.database.engine import engine
 from backend.database.base_class import Base
+from sqlalchemy import select
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,6 +19,23 @@ async def lifespan(app: FastAPI):
         async with engine.begin() as conn:
             # Create all tables if they don't exist
             await conn.run_sync(Base.metadata.create_all)
+        if settings.ADMIN_PASSWORD:
+            from backend.database.engine import AsyncSessionLocal
+            from backend.models.user import User, UserRole
+            from backend.core.security import get_password_hash
+
+            async with AsyncSessionLocal() as db:
+                result = await db.execute(select(User).where(User.email == settings.ADMIN_EMAIL))
+                admin = result.scalar_one_or_none()
+                if not admin:
+                    db.add(User(
+                        email=settings.ADMIN_EMAIL,
+                        hashed_password=get_password_hash(settings.ADMIN_PASSWORD),
+                        role=UserRole.admin,
+                        name="Admin",
+                    ))
+                    await db.commit()
+                    logger.info("Bootstrap admin user created.")
         logger.info("Database initialized.")
     except Exception as e:
         logger.error(f"Could not connect to the database: {e}")

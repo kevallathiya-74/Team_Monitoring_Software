@@ -19,7 +19,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           sx={{
             flex: 1,
             minWidth: 0,
-            ml: { md: `${DRAWER_WIDTH}px` },
             display: 'flex',
             flexDirection: 'column',
             minHeight: '100vh',

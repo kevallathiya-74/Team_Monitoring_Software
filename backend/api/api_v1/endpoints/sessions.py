@@ -13,7 +13,8 @@ router = APIRouter()
 @router.post("/start", response_model=SessionSchema)
 async def start_session(
     db: AsyncSession = Depends(deps.get_db),
-    current_device: Device = Depends(deps.get_current_device)
+    current_device: Device = Depends(deps.get_current_device),
+    agent_key: None = Depends(deps.verify_agent_key),
 ):
     # Ensure no other active session exists for this device
     stmt = select(Session).where(
@@ -46,7 +47,8 @@ async def start_session(
 @router.post("/stop")
 async def stop_session(
     db: AsyncSession = Depends(deps.get_db),
-    current_device: Device = Depends(deps.get_current_device)
+    current_device: Device = Depends(deps.get_current_device),
+    agent_key: None = Depends(deps.verify_agent_key),
 ):
     stmt = select(Session).where(
         Session.device_id == current_device.id,

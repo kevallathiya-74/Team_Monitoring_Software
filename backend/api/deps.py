@@ -1,7 +1,7 @@
 from collections.abc import AsyncGenerator
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from jose import jwt, JWTError
 import uuid
@@ -63,6 +63,20 @@ async def get_current_device(
     if device is None or not device.is_active:
         raise credentials_exception
     return device
+
+async def verify_agent_key(
+    x_agent_key: str | None = Header(default=None, alias="X-Agent-Key")
+) -> None:
+    if not settings.AGENT_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Agent API key is not configured",
+        )
+    if x_agent_key != settings.AGENT_API_KEY:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or missing agent key",
+        )
 
 async def get_current_admin(
     current_user: User = Depends(get_current_user)
