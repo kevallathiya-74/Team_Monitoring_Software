@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     MAX_RECORDING_DURATION: int
     
     CODE_TTL_SECONDS: int
+    ADMIN_EMAIL: str = "admin@example.com"
+    ADMIN_PASSWORD: str | None = None
 
     model_config = SettingsConfigDict(
         env_file=os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"),

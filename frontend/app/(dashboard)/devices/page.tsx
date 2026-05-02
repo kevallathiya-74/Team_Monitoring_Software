@@ -1,73 +1,65 @@
 'use client';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Box, Card, CardContent, Typography, Chip, Table, TableBody,
   TableCell, TableContainer, TableHead, TableRow, Avatar, Skeleton,
-  Alert, TextField, InputAdornment, IconButton, Tooltip, Button
+  TextField, InputAdornment, IconButton, Tooltip
 } from '@mui/material';
 import {
-  DevicesRounded, SearchRounded, RefreshRounded, OpenInNewRounded,
+  DevicesRounded, SearchRounded, OpenInNewRounded,
   WifiRounded, WifiOffRounded, FiberManualRecordRounded,
   FilterListRounded
 } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
 import { formatDistanceToNow, parseISO, format } from 'date-fns';
 import TopBar from '@/components/TopBar';
-import { getDashboardDevices, type DeviceSummary } from '@/lib/api';
+import { apiErrorMessage } from '@/lib/api';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useDashboardDevices } from '@/hooks/useMonitoringData';
+import { ErrorState } from '@/components/ui/DataState';
 
 export default function DevicesPage() {
   const router = useRouter();
-  const [devices, setDevices]   = useState<DeviceSummary[]>([]);
-  const [loading, setLoading]   = useState(true);
-  const [error, setError]       = useState('');
   const [search, setSearch]     = useState('');
   const [filter, setFilter]     = useState<'all' | 'online' | 'offline'>('all');
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const { data: devices = [], error, isLoading, isValidating, mutate } = useDashboardDevices();
 
-  const fetchDevices = useCallback(async () => {
-    try {
-      setError('');
-      const res = await getDashboardDevices();
-      setDevices(res.data);
-    } catch (err: any) {
-      setError(err?.response?.data?.detail || 'Failed to load devices.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const filtered = useMemo(() => {
+    const query = debouncedSearch.trim().toLowerCase();
+    return devices.filter((d) => {
+      const matchSearch =
+        !query ||
+        d.hostname.toLowerCase().includes(query) ||
+        d.local_ip.toLowerCase().includes(query);
+      const matchFilter =
+        filter === 'all' ||
+        (filter === 'online' && d.is_online) ||
+        (filter === 'offline' && !d.is_online);
+      return matchSearch && matchFilter;
+    });
+  }, [debouncedSearch, devices, filter]);
 
-  useEffect(() => { fetchDevices(); }, [fetchDevices]);
-  useEffect(() => {
-    const t = setInterval(fetchDevices, 30_000);
-    return () => clearInterval(t);
-  }, [fetchDevices]);
-
-  const filtered = devices.filter((d) => {
-    const matchSearch =
-      d.hostname.toLowerCase().includes(search.toLowerCase()) ||
-      d.local_ip.includes(search);
-    const matchFilter =
-      filter === 'all' ||
-      (filter === 'online' && d.is_online) ||
-      (filter === 'offline' && !d.is_online);
-    return matchSearch && matchFilter;
-  });
-
-  const online  = devices.filter((d) => d.is_online).length;
+  const online = useMemo(() => devices.filter((d) => d.is_online).length, [devices]);
+  const loading = isLoading && devices.length === 0;
 
   return (
     <Box sx={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
       <TopBar
         title="Devices"
         subtitle="All registered monitoring endpoints"
-        onRefresh={() => { setLoading(true); fetchDevices(); }}
+        onRefresh={() => { void mutate(); }}
         liveCount={online}
       />
 
       <Box sx={{ p: { xs: 2, sm: 3 }, flex: 1 }}>
         {error && (
-          <Alert severity="error" sx={{ mb: 2.5 }} onClose={() => setError('')}>
-            {error}
-          </Alert>
+          <Box sx={{ mb: 2.5 }}>
+            <ErrorState
+              message={apiErrorMessage(error, 'Failed to load devices.')}
+              onRetry={() => { void mutate(); }}
+            />
+          </Box>
         )}
 
         <Card>
@@ -85,12 +77,14 @@ export default function DevicesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 sx={{ width: { xs: '100%', sm: 280 } }}
-                InputProps={{
-                  startAdornment: (
-                    <InputAdornment position="start">
-                      <SearchRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <SearchRounded sx={{ fontSize: 18, color: 'text.secondary' }} />
+                      </InputAdornment>
+                    ),
+                  },
                 }}
               />
 
@@ -104,14 +98,14 @@ export default function DevicesPage() {
                     clickable
                     onClick={() => setFilter(f)}
                     icon={
-                      f === 'online' ? <FiberManualRecordRounded sx={{ fontSize: '8px !important', color: '#00d4aa !important' }} /> :
-                      f === 'offline' ? <FiberManualRecordRounded sx={{ fontSize: '8px !important', color: '#ff4d6a !important' }} /> :
+                      f === 'online' ? <FiberManualRecordRounded sx={{ fontSize: '8px !important', color: '#10b981 !important' }} /> :
+                      f === 'offline' ? <FiberManualRecordRounded sx={{ fontSize: '8px !important', color: '#ef4444 !important' }} /> :
                       <FilterListRounded sx={{ fontSize: '14px !important' }} />
                     }
                     sx={{
-                      fontWeight: 600,
-                      background: filter === f ? 'rgba(79,107,255,0.18)' : 'rgba(255,255,255,0.04)',
-                      border: filter === f ? '1px solid rgba(79,107,255,0.4)' : '1px solid rgba(255,255,255,0.08)',
+                      fontWeight: 700,
+                      background: filter === f ? 'rgba(168, 85, 247, 0.18)' : 'rgba(255,255,255,0.04)',
+                      border: filter === f ? '1px solid rgba(168, 85, 247, 0.4)' : '1px solid rgba(255,255,255,0.08)',
                       color: filter === f ? 'primary.light' : 'text.secondary',
                     }}
                   />
@@ -138,7 +132,7 @@ export default function DevicesPage() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {loading ? (
+                {(loading || isValidating) && devices.length === 0 ? (
                     [...Array(5)].map((_, i) => (
                       <TableRow key={i}>
                         {[...Array(6)].map((__, j) => (
@@ -161,7 +155,7 @@ export default function DevicesPage() {
                         try { return formatDistanceToNow(parseISO(device.last_seen_at), { addSuffix: true }); }
                         catch { return '—'; }
                       })();
-                      const statusColor = device.is_online ? '#00d4aa' : '#ff4d6a';
+                      const statusColor = device.is_online ? '#10b981' : '#ef4444';
 
                       return (
                         <TableRow
@@ -174,12 +168,12 @@ export default function DevicesPage() {
                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                               <Avatar sx={{
                                 width: 34, height: 34, borderRadius: '8px', fontSize: '0.8rem',
-                                background: device.is_online ? 'rgba(0,212,170,0.1)' : 'rgba(255,77,106,0.1)',
+                              background: device.is_online ? 'rgba(16,185,129,0.1)' : 'rgba(239,68,68,0.1)',
                                 border: `1px solid ${statusColor}25`,
                               }}>
                                 {device.is_online
-                                  ? <WifiRounded sx={{ fontSize: 16, color: '#00d4aa' }} />
-                                  : <WifiOffRounded sx={{ fontSize: 16, color: '#ff4d6a' }} />
+                                  ? <WifiRounded sx={{ fontSize: 16, color: '#10b981' }} />
+                                  : <WifiOffRounded sx={{ fontSize: 16, color: '#ef4444' }} />
                                 }
                               </Avatar>
                               <Box>
@@ -240,6 +234,12 @@ export default function DevicesPage() {
             </TableContainer>
           </CardContent>
         </Card>
+
+        {isValidating && devices.length > 0 && (
+          <Typography sx={{ mt: 1.5, fontSize: '0.8rem', color: 'text.secondary' }}>
+            Refreshing device list...
+          </Typography>
+        )}
       </Box>
     </Box>
   );

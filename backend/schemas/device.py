@@ -1,6 +1,5 @@
 from datetime import datetime
 import uuid
-from typing import Optional
 from pydantic import BaseModel
 
 class DeviceBase(BaseModel):
@@ -16,5 +15,15 @@ class Device(DeviceBase):
     last_seen_at: datetime
     is_active: bool
     created_at: datetime
+
+    model_config = {"from_attributes": True}
+
+class DeviceHeartbeat(BaseModel):
+    status: str = "active"
+
+class DeviceStatus(BaseModel):
+    id: uuid.UUID
+    last_seen_at: datetime
+    is_active: bool
 
     model_config = {"from_attributes": True}

@@ -11,7 +11,7 @@ from backend.core.config import settings
 from backend.models.device import Device
 from backend.models.session import Session
 from backend.models.recording import Recording, MediaType
-from backend.schemas.recording import RecordingResponse
+from backend.schemas.recording import RecordingMetadataCreate, RecordingResponse
 
 router = APIRouter()
 
@@ -23,7 +23,8 @@ async def upload_media(
     media_type: MediaType = Form(...),
     file: UploadFile = File(...),
     db: AsyncSession = Depends(deps.get_db),
-    current_device: Device = Depends(deps.get_current_device)
+    current_device: Device = Depends(deps.get_current_device),
+    agent_key: None = Depends(deps.verify_agent_key),
 ):
     # Ensure session belongs to the current device and is valid
     stmt = select(Session).where(
@@ -73,4 +74,36 @@ async def upload_media(
     await db.commit()
     await db.refresh(recording)
     
+    return recording
+
+@router.post("/metadata", response_model=RecordingResponse)
+async def create_recording_metadata(
+    payload: RecordingMetadataCreate,
+    db: AsyncSession = Depends(deps.get_db),
+    current_device: Device = Depends(deps.get_current_device),
+    agent_key: None = Depends(deps.verify_agent_key),
+):
+    stmt = select(Session).where(
+        Session.id == payload.session_id,
+        Session.device_id == current_device.id,
+    )
+    result = await db.execute(stmt)
+    session = result.scalar_one_or_none()
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found or belongs to another device")
+
+    ts = payload.start_time.replace(tzinfo=None) if payload.start_time.tzinfo else payload.start_time
+    recording = Recording(
+        session_id=payload.session_id,
+        device_id=current_device.id,
+        file_path=payload.file_path,
+        start_time=ts,
+        duration_seconds=payload.duration_seconds,
+        media_type=payload.media_type,
+    )
+    db.add(recording)
+    current_device.last_seen_at = datetime.utcnow()
+    db.add(current_device)
+    await db.commit()
+    await db.refresh(recording)
     return recording

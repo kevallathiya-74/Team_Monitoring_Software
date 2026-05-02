@@ -1,7 +1,7 @@
 from datetime import datetime, timedelta
 import random
 import string
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
@@ -10,6 +10,8 @@ from backend.core import security
 from backend.core.config import settings
 from backend.models.user import User, UserRole
 from backend.models.auth_code import AuthCode
+from backend.models.device import Device
+from backend.models.session import Session
 from backend.schemas.auth import AdminLogin, Token, CodeResponse, VerifyCode
 
 router = APIRouter()
@@ -37,28 +39,9 @@ async def login_admin(
 
 @router.post("/generate-code", response_model=CodeResponse)
 async def generate_code(
-    # In a real app we'd require an admin JWT here
-    db: AsyncSession = Depends(deps.get_db)
+    db: AsyncSession = Depends(deps.get_db),
+    admin_user: User = Depends(deps.get_current_admin),
 ):
-    # For MVP, we might not strictly enforce the admin dependency until we wire up the UI,
-    # but let's assume we have an admin user in the DB to associate with.
-    # We will just fetch the first admin or create one if none exists (for MVP bootstrap).
-    stmt = select(User).where(User.role == UserRole.admin)
-    result = await db.execute(stmt)
-    admin_user = result.scalars().first()
-    
-    if not admin_user:
-        # Bootstrap an admin user if missing
-        admin_user = User(
-            email="admin@example.com",
-            hashed_password=security.get_password_hash("admin123"),
-            role=UserRole.admin
-        )
-        db.add(admin_user)
-        await db.commit()
-        await db.refresh(admin_user)
-
-    # Generate a 6-digit code
     code_str = "".join(random.choices(string.digits, k=6))
     expires_at = datetime.utcnow() + timedelta(seconds=settings.CODE_TTL_SECONDS)
     
@@ -90,42 +73,38 @@ async def verify_code(
     if datetime.utcnow() > auth_code.expires_at:
         raise HTTPException(status_code=400, detail="Code expired")
         
-    # Mark as used
-    auth_code.is_used = True
-    
-    # In Step 3 we register the device here.
-    
-    # Create or get a generic employee user
-    stmt_emp = select(User).where(User.role == UserRole.employee)
-    result_emp = await db.execute(stmt_emp)
-    employee = result_emp.scalars().first()
-    
-    if not employee:
-        employee = User(
-            role=UserRole.employee,
-            name=f"Employee {payload.hostname}"
-        )
-        db.add(employee)
-        await db.commit()
-        await db.refresh(employee)
+    employee = User(
+        role=UserRole.employee,
+        name=f"Employee {payload.hostname}"
+    )
+    db.add(employee)
+    await db.flush()
 
-    # Register the device
-    from backend.models.device import Device
-    
     device = Device(
         user_id=employee.id,
         hostname=payload.hostname,
         local_ip=payload.local_ip
     )
     db.add(device)
+    await db.flush()
+
+    session = Session(device_id=device.id, is_active=True)
+    db.add(session)
+    auth_code.is_used = True
+
     await db.commit()
     await db.refresh(device)
+    await db.refresh(session)
 
-    # Return JWT scoped with device_id
     access_token = security.create_access_token(
         subject=str(employee.id),
-        additional_claims={"device_id": str(device.id)},
-        expires_delta=timedelta(days=365) # Long-lived for devices
+        additional_claims={"device_id": str(device.id), "session_id": str(session.id)},
+        expires_delta=timedelta(days=365)
     )
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "device_id": str(device.id),
+        "session_id": str(session.id),
+    }
