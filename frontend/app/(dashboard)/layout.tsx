@@ -8,7 +8,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const [mobileOpen, setMobileOpen] = useState(false);
 
   return (
-    <AuthGuard>
+    <AuthGuard role="admin">
       <Box sx={{ display: 'flex', minHeight: '100vh' }}>
         <Sidebar
           mobileOpen={mobileOpen}

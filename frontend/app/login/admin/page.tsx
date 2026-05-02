@@ -32,7 +32,7 @@ export default function AdminLoginPage() {
     setError('');
     try {
       const res = await adminLogin(email, password);
-      setToken(res.data.access_token);
+      setToken(res.data.access_token, undefined, undefined, 'admin');
       router.push('/dashboard');
     } catch (err: unknown) {
       setError(apiErrorMessage(err, 'Login failed. Check your credentials.'));

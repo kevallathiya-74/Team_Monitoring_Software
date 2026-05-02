@@ -22,6 +22,7 @@ export interface DeviceReport {
 }
 
 export const monitoringKeys = {
+  employeeMe: '/dashboard/employee/me',
   devices: '/dashboard/devices',
   timeline: (deviceId: string, startTime?: string, endTime?: string) =>
     ['device-timeline', deviceId, startTime ?? '', endTime ?? ''] as const,
@@ -34,6 +35,19 @@ export function useDashboardDevices() {
   return useSWR<DeviceSummary[]>(
     monitoringKeys.devices,
     async () => (await getDashboardDevices()).data,
+    {
+      refreshInterval: REFRESH_MS,
+      revalidateOnFocus: true,
+      keepPreviousData: true,
+      dedupingInterval: 5_000,
+    },
+  );
+}
+
+export function useEmployeeMe() {
+  return useSWR<DeviceSummary>(
+    monitoringKeys.employeeMe,
+    async () => (await (await import('@/lib/api')).getEmployeeMe()).data,
     {
       refreshInterval: REFRESH_MS,
       revalidateOnFocus: true,

@@ -4,22 +4,39 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/store/authStore';
 import { Box, CircularProgress, Typography } from '@mui/material';
 
-export default function AuthGuard({ children }: { children: React.ReactNode }) {
+export default function AuthGuard({
+  children,
+  role,
+}: {
+  children: React.ReactNode;
+  role?: 'admin' | 'employee';
+}) {
   const { isAuthenticated, token } = useAuthStore();
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
+  const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
     setMounted(true);
 
     // Check localStorage directly after mount so SSR and the first client render match.
     const storedToken = localStorage.getItem('auth_token');
+    const storedRole = localStorage.getItem('auth_role');
     if (!storedToken && !token) {
+      setAllowed(false);
       router.replace('/login');
+      return;
     }
-  }, [token, router]);
 
-  if (!mounted || (!isAuthenticated && !token)) {
+    if (role && storedRole && storedRole !== role) {
+      setAllowed(false);
+      router.replace(storedRole === 'employee' ? '/employee/dashboard' : '/dashboard');
+      return;
+    }
+    setAllowed(true);
+  }, [role, token, router]);
+
+  if (!mounted || !allowed || (!isAuthenticated && !token)) {
     return (
       <Box
         sx={{

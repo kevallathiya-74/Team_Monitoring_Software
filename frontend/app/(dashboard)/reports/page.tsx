@@ -12,7 +12,7 @@ import {
 } from '@mui/icons-material';
 import TopBar from '@/components/TopBar';
 import { apiErrorMessage } from '@/lib/api';
-import { useDeviceReports } from '@/hooks/useMonitoringData';
+import { useDeviceReports, type DeviceReport } from '@/hooks/useMonitoringData';
 import { useMonitoringStore } from '@/store/monitoringStore';
 import { ErrorState, EmptyState } from '@/components/ui/DataState';
 

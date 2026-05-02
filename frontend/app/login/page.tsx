@@ -43,8 +43,8 @@ export default function EmployeeLoginPage() {
     setError('');
     try {
       const res = await verifyCode(code, hostname, localIp);
-      setToken(res.data.access_token, res.data.device_id, res.data.session_id);
-      router.push('/dashboard');
+      setToken(res.data.access_token, res.data.device_id, res.data.session_id, 'employee');
+      router.push('/login/success');
     } catch (err: unknown) {
       setError(apiErrorMessage(err, 'Invalid code. Please check and try again.'));
     } finally {
